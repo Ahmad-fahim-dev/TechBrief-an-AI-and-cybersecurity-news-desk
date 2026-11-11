@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e8c64a">
+  <meta name="description" content="TechBrief — AI and cybersecurity news. Stay informed. Stay ahead.">
+  <title>TechBrief — Stay Informed. Stay Ahead.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/editorial.css">
+</head>
+<body>
+  <div class="publication">
+    <header class="site-header">
+      <a class="wordmark" href="#" data-view-link="home" aria-label="TechBrief home"><span>Tech</span><b>Brief</b><small>NEWS</small></a>
+      <button class="menu-toggle" id="menu-toggle" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span><span></span></button>
+      <nav class="site-nav" id="site-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="home">NEWS</button>
+        <button class="nav-item" data-view="ai">AI</button>
+        <button class="nav-item" data-view="cyber">CYBERSECURITY</button>
+        <button class="nav-item" data-view="research">RESEARCH</button>
+        <button class="nav-item" data-view="insights">INSIGHTS</button>
+        <button class="nav-item" data-view="governance">AGENT GOVERNANCE</button>
+        <button class="nav-item" data-view="trending">TRENDING <span class="nav-chevron">⌄</span></button>
+        <button class="subscribe-button" id="subscribe-button">SUBSCRIBE <span>↗</span></button>
+      </nav>
+    </header>
+
+    <div class="ticker" aria-label="Publication status">
+      <span class="ticker-label"><i></i> THE DAILY BRIEF</span>
+      <span class="ticker-text" id="ticker-text">AI &amp; cybersecurity news, selected for clarity.</span>
+      <span class="ticker-date" id="edition-date"></span>
+    </div>
+
+    <main>
+      <div class="notice hidden" id="notice" role="status"></div>
+      <section class="view active" id="view-home">
+        <div class="page-kicker"><span>ARTIFICIAL INTELLIGENCE</span><i></i><span>CYBERSECURITY</span><b id="home-updated">LATEST EDITION</b></div>
+        <section class="lead-story" id="lead-story">
+          <div class="lead-art art-ai" id="lead-art"><img id="lead-image" alt="" class="lead-photo"><div class="art-orbit orbit-one" aria-hidden="true"></div><div class="art-orbit orbit-two" aria-hidden="true"></div><div class="art-core" aria-hidden="true"><span>TB</span></div><div class="art-caption" aria-hidden="true">INTELLIGENCE<br>IN MOTION</div><div class="art-index" aria-hidden="true">01 / SIGNAL</div><span class="image-credit hidden" id="lead-image-credit"></span></div>
+          <div class="lead-copy">
+            <div class="author-line"><span class="author-avatar">TB</span><span><b>TechBrief Editorial</b><small id="lead-meta">Daily intelligence desk</small></span><span class="lead-reading">8 MIN READ</span></div>
+            <span class="category-label ai-label" id="lead-category">AI &amp; CYBERSECURITY</span>
+            <h1 id="lead-title">The signals shaping tomorrow, clearly in focus.</h1>
+            <p id="lead-summary">A considered briefing on artificial intelligence and cybersecurity. Source-linked developments, useful context, and no noise.</p>
+            <button class="read-story" id="lead-open">READ THE LATEST <span>↗</span></button>
+          </div>
+          <div class="lead-corner">TECHBRIEF / 001</div>
+        </section>
+
+        <div class="section-title-row"><div><span class="section-kicker">THE LATEST</span><h2>News worth your attention<span class="period">.</span></h2></div><div class="heading-actions"><button class="underlined-link" id="generate-button">Generate today's brief <span>↗</span></button><button class="underlined-link" data-view="trending">Explore trending <span>→</span></button></div></div>
+        <div class="latest-layout">
+          <div class="latest-grid" id="latest-grid"><div class="editorial-empty">Loading source-linked reporting…</div></div>
+          <aside class="brief-rail">
+            <div class="rail-heading"><span>THE BRIEF</span><span class="rail-rule"></span><span>01—05</span></div>
+            <h3>Five things<br>to know today.</h3>
+            <div class="brief-list" id="brief-list"><p>Today's takeaways appear with the latest report.</p></div>
+            <button class="rail-link" data-view="trending">SEE WHAT'S TRENDING <span>↗</span></button>
+          </aside>
+        </div>
+
+        <section class="editors-section">
+          <div class="editors-heading"><div><span class="section-kicker">A CLOSER LOOK</span><h2>Editor's Picks</h2></div><button class="yellow-link" data-view="insights">SEE MORE <span>↗</span></button></div>
+          <div class="editors-grid" id="editors-grid"><div class="editorial-empty">Curated stories will appear here after the first collection.</div></div>
+        </section>
+
+        <section class="newsletter-band"><div><span class="section-kicker">A CLEARER SIGNAL</span><h2>Stay informed.<br><em>Stay ahead.</em></h2></div><p>AI and cybersecurity developments, thoughtfully selected for your day.</p><button class="newsletter-button" id="newsletter-button">GET THE DAILY BRIEF <span>↗</span></button></section>
+      </section>
+
+      <section class="view" id="view-trending">
+        <div class="section-title-row trending-heading"><div><span class="section-kicker">WHAT MATTERS RIGHT NOW</span><h1>Trending<span class="period">.</span></h1></div><p>Signal from across AI and cybersecurity, ranked by relevance.</p></div>
+        <div class="category-filters" id="trending-filters" role="group" aria-label="Filter trending stories">
+          <button class="filter-chip selected" data-category="">ALL</button><button class="filter-chip" data-category="ai">AI</button><button class="filter-chip" data-category="cybersecurity">CYBERSECURITY</button><button class="filter-chip" data-category="research">RESEARCH</button><button class="filter-chip" data-category="business">BUSINESS</button><button class="filter-chip" data-category="startups">STARTUPS</button><button class="filter-chip" data-category="technology">TECHNOLOGY</button><button class="filter-chip" data-category="more">MORE⌄</button>
+        </div>
+        <div class="trending-layout"><div class="trending-feature" id="trending-feature"><div class="editorial-empty">Loading trending stories…</div></div><div class="trending-middle" id="trending-middle"></div><aside class="trending-rail"><div class="rail-heading"><span>THE SHORTLIST</span><span class="rail-rule"></span></div><div id="trending-shortlist"></div></aside></div><div class="trending-more-grid" id="trending-more-grid"></div>
+        <button class="load-more" id="trending-more">LOAD MORE STORIES <span>↓</span></button>
+      </section>
+
+      <section class="view topic-view" id="view-ai">
+        <div class="topic-masthead ai-masthead"><span class="section-kicker">IDEAS BECOME INTELLIGENCE</span><h1>Artificial<br><em>Intelligence.</em></h1><p>New models, original research, intelligent agents, and the people moving the field forward.</p></div>
+        <div class="topic-tools"><div class="topic-tabs"><button class="topic-tab active" data-subcategory="">LATEST</button><button class="topic-tab" data-subcategory="research">RESEARCH</button><button class="topic-tab" data-subcategory="models">MODELS</button><button class="topic-tab" data-subcategory="agents">AGENTS</button></div><label class="search-box"><span>⌕</span><input id="ai-search" type="search" placeholder="Search AI coverage…" aria-label="Search AI news"></label></div>
+        <div class="topic-grid" id="ai-grid"><div class="editorial-empty">Loading AI coverage…</div></div>
+      </section>
+
+      <section class="view topic-view" id="view-cyber">
+        <div class="topic-masthead cyber-masthead"><span class="section-kicker">A CLEAR-EYED VIEW OF THE THREAT LANDSCAPE</span><h1>Cybersecurity<br><em>watch.</em></h1><p>Vulnerabilities, threat research, incidents, and advisories — with severity only when the source supports it.</p></div>
+        <div class="topic-tools"><div class="topic-tabs"><button class="topic-tab active" data-subcategory="">LATEST</button><button class="topic-tab" data-subcategory="vulnerability">VULNERABILITIES</button><button class="topic-tab" data-subcategory="threat">THREATS</button><button class="topic-tab" data-subcategory="advisory">ADVISORIES</button></div><label class="search-box"><span>⌕</span><input id="cyber-search" type="search" placeholder="Search security coverage…" aria-label="Search cybersecurity news"></label></div>
+        <div class="topic-grid" id="cyber-grid"><div class="editorial-empty">Loading cybersecurity coverage…</div></div>
+      </section>
+
+      <section class="view topic-view" id="view-research">
+        <div class="plain-masthead"><span class="section-kicker">PAPERS, BREAKTHROUGHS &amp; TECHNICAL SIGNALS</span><h1>Research<span class="period">.</span></h1><p>Original work and technical developments across AI and cybersecurity.</p></div>
+        <div class="topic-tools"><div class="topic-tabs"><button class="topic-tab active" data-research-category="">ALL RESEARCH</button><button class="topic-tab" data-research-category="ai">AI</button><button class="topic-tab" data-research-category="cybersecurity">SECURITY</button></div><label class="search-box"><span>⌕</span><input id="research-search" type="search" placeholder="Search research…" aria-label="Search research"></label></div>
+        <div class="topic-grid" id="research-grid"><div class="editorial-empty">Loading research…</div></div>
+      </section>
+
+      <section class="view topic-view" id="view-insights">
+        <div class="plain-masthead insights-masthead"><span class="section-kicker">CONTEXT OVER THE CYCLE</span><h1>Insights<span class="period">.</span></h1><p>Explanations and analysis to help make sense of the technologies changing the world.</p></div>
+        <div class="insights-lead"><div class="insight-art" aria-hidden="true"><span>BEYOND<br>THE HEADLINE</span></div><div><span class="category-label ai-label">THE EDITOR'S VIEW</span><h2>Understanding the signal is only the beginning.</h2><p>Explore the latest source-linked developments with context on why they matter and who they affect.</p></div></div>
+        <div class="topic-grid" id="insights-grid"><div class="editorial-empty">Loading analysis…</div></div>
+      </section>
+
+      <section class="view article-view" id="view-article">
+        <div class="article-back"><button id="article-back">← BACK TO THE NEWS</button><span>TECHBRIEF / ARTICLE</span></div>
+        <article class="article-content" id="article-content"><div class="editorial-empty">Choose a story to read.</div></article>
+      </section>
+
+      <section class="view topic-view" id="view-archive">
+        <div class="plain-masthead"><span class="section-kicker">THE RECORD</span><h1>Archive<span class="period">.</span></h1><p>Browse past briefings and source-linked coverage.</p></div>
+        <div class="topic-tools"><div class="topic-tabs"><button class="topic-tab active" data-archive-category="">ALL</button><button class="topic-tab" data-archive-category="ai">AI</button><button class="topic-tab" data-archive-category="cybersecurity">CYBERSECURITY</button></div><label class="search-box"><span>⌕</span><input id="archive-search" type="search" placeholder="Search the archive…" aria-label="Search archive"></label></div>
+        <div class="topic-grid" id="archive-grid"></div><div class="archive-reports" id="archive-reports"></div>
+      </section>
+
+      <section class="view topic-view" id="view-bookmarks">
+        <div class="plain-masthead"><span class="section-kicker">YOUR READING LIST</span><h1>Saved stories<span class="period">.</span></h1><p>Reporting you have saved to return to later.</p></div><div class="topic-grid" id="bookmarks-grid"></div>
+      </section>
+
+      <section class="view topic-view" id="view-settings">
+        <div class="plain-masthead"><span class="section-kicker">YOUR BRIEFING, YOUR WAY</span><h1>Preferences<span class="period">.</span></h1></div>
+        <form class="preferences-form" id="settings-form"><fieldset><legend>Daily edition</legend><div class="preferences-row"><label>Delivery time<input name="scheduled_time" type="time" value="09:00" required></label><label>Timezone<select name="timezone"><option value="Asia/Karachi">Asia/Karachi</option><option value="UTC">UTC</option><option value="America/New_York">America/New_York</option><option value="Europe/London">Europe/London</option><option value="Asia/Kolkata">Asia/Kolkata</option></select></label></div><label class="preference-check"><input name="schedule_enabled" type="checkbox" checked> Enable the automatic daily briefing</label></fieldset><fieldset><legend>Coverage</legend><div class="preferences-row"><label><input name="category_ai" type="checkbox" checked> Artificial intelligence</label><label><input name="category_cyber" type="checkbox" checked> Cybersecurity</label></div><label>Stories per category<select name="articles_per_category"><option value="5">5</option><option value="7" selected>7</option><option value="10">10</option><option value="15">15</option><option value="20">20</option></select></label><div class="source-options" id="source-options"></div></fieldset><div class="preferences-submit"><span id="settings-message" role="status"></span><button class="yellow-button" type="submit">SAVE PREFERENCES ↗</button></div></form>
+      </section>
+
+      <section class="view topic-view governance-view" id="view-governance">
+        <div class="plain-masthead"><span class="section-kicker">IDENTITY · SCOPE · ACCOUNTABILITY</span><h1>Agent governance<span class="period">.</span></h1><p>Review agent permissions and proposed operations. Restricted operations remain deny-by-default; SOC connections are not enabled.</p></div>
+        <form class="governance-login" id="governance-login"><label>Admin bearer token<input id="governance-token" type="password" autocomplete="current-password" minlength="32" required placeholder="Configure ADMIN_API_TOKEN in the backend .env"></label><button class="yellow-button" type="submit">UNLOCK GOVERNANCE ↗</button><button class="underlined-link hidden" id="governance-lock" type="button">LOCK</button><p id="governance-status" role="status">Governance requires a configured administrator token.</p></form>
+        <div class="governance-dashboard hidden" id="governance-dashboard">
+          <div class="governance-toolbar"><span id="governance-user"></span><button class="underlined-link" id="governance-refresh" type="button">REFRESH ↻</button></div>
+          <section class="governance-panel"><span class="section-kicker">REGISTERED AGENTS</span><div class="governance-agents" id="governance-agents"></div></section>
+          <section class="governance-panel"><span class="section-kicker">ACTIVE &amp; EXPIRING PERMISSIONS</span><form id="governance-permission-form" class="governance-action-form">
+            <label>Agent<select name="agent_id" required></select></label>
+            <label>Allowed action<select name="allowed_action" required></select></label>
+            <label>Resource scope<input name="resource_scope" required maxlength="300"></label>
+            <label>Expires in minutes<input name="expires_in_minutes" type="number" min="1" max="43200" value="60" required></label>
+            <label class="governance-reason">Approval reference<input name="approval_reference" maxlength="80" placeholder="Required for external/SOC permissions"></label>
+            <button class="yellow-button" type="submit">GRANT SCOPED PERMISSION ↗</button><span id="governance-permission-status" role="status"></span>
+          </form><div id="governance-permissions"></div></section>
+          <section class="governance-panel"><span class="section-kicker">PENDING APPROVALS</span><div id="governance-approvals"></div></section>
+          <section class="governance-panel"><span class="section-kicker">REQUEST AN ACTION</span><form id="governance-action-form" class="governance-action-form">
+            <label>Agent<select name="agent_id" required></select></label>
+            <label>Operation<select name="requested_action" required><option value="external.ticket.draft">Draft security ticket</option><option value="external.incident_report.draft">Draft incident report</option><option value="external.detection_rule.draft">Draft detection rule</option><option value="soc.ticket.create">Create external SOC ticket (approval required)</option><option value="soc.detection_rule.modify">Modify detection rule (approval required)</option><option value="soc.security_config.modify">Modify security configuration (approval required)</option></select></label>
+            <label>Target resource<input name="target_resource" value="external:drafts" required maxlength="300"></label>
+            <label class="governance-reason">Reason / proposed content<textarea name="reason" required maxlength="2000" rows="3"></textarea></label>
+            <button class="yellow-button" type="submit">SUBMIT ACTION REQUEST ↗</button><span id="governance-action-status" role="status"></span>
+          </form></section>
+          <section class="governance-panel"><span class="section-kicker">RECENT ACTIONS</span><div id="governance-actions"></div></section>
+          <section class="governance-panel"><span class="section-kicker">AUDIT HISTORY · APPEND-ONLY</span><div id="governance-audit"></div></section>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer"><a class="wordmark footer-wordmark" href="#" data-view-link="home"><span>Tech</span><b>Brief</b><small>NEWS</small></a><p>AI &amp; CYBERSECURITY NEWS<br><span>Stay informed. Stay ahead.</span></p><div class="footer-links"><button data-view="ai">AI</button><button data-view="cyber">CYBERSECURITY</button><button data-view="trending">TRENDING</button><button data-view="governance">GOVERNANCE</button><button data-view="settings">PREFERENCES</button></div><button class="footer-fetch-button" id="fetch-news-button" type="button">FETCH LATEST NEWS <span>↗</span></button><span class="copyright">© TECHBRIEF</span></footer>
+  </div>
+  <div class="modal-backdrop hidden" id="subscribe-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="subscribe-modal"><button class="modal-close" id="modal-close" aria-label="Close">×</button><span class="section-kicker">THE DAILY BRIEF</span><h2 id="modal-title">Get a clearer signal.</h2><p>Automatic email subscriptions are not connected in this version. Set your local daily briefing schedule in Preferences.</p><button class="yellow-button" id="modal-preferences">OPEN PREFERENCES ↗</button></div></div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
