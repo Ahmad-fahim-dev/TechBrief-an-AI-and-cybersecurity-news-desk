@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from backend.app.config import Settings
 from backend.app.models import AppSettings, DailyReport
 from backend.app.services.report_service import generate_report
+from backend.app.services.governance import prune_audit_logs
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ async def scheduled_generation(session_factory: sessionmaker, config: Settings) 
         options = session.get(AppSettings, 1)
         if not options or not options.schedule_enabled:
             return
+        prune_audit_logs(session)
         # Skip when any other generation (manual run or another worker) is
         # mid-flight: concurrent runs duplicate provider spend and collide on
         # article upserts.
