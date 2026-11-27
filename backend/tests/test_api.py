@@ -8,10 +8,19 @@ from backend.app.config import Settings
 from backend.app.main import create_app
 from backend.app.models import Article
 
+ADMIN_TOKEN = "api-test-token-" + ("y" * 32)
+
+
+def admin_headers():
+    return {"Authorization": f"Bearer {ADMIN_TOKEN}"}
+
 
 def test_settings_news_search_and_bookmarks(tmp_path):
     db_path = str(tmp_path / "test.db").replace("\\", "/")
-    app = create_app(Settings(_env_file=None, database_url=f"sqlite:///{db_path}"), start_scheduler=False)
+    app = create_app(
+        Settings(_env_file=None, database_url=f"sqlite:///{db_path}", admin_api_token=ADMIN_TOKEN),
+        start_scheduler=False,
+    )
 
     with TestClient(app) as client:
         page = client.get("/")
@@ -67,7 +76,7 @@ def test_settings_news_search_and_bookmarks(tmp_path):
         assert bookmark["image_alt"] == "Research team at work"
         assert client.delete(f"/api/bookmarks/{saved.json()['id']}").status_code == 204
 
-        updated = client.put("/api/settings", json={
+        updated = client.put("/api/settings", headers=admin_headers(), json={
             "timezone": "UTC",
             "scheduled_time": "08:30",
             "schedule_enabled": False,
@@ -93,7 +102,10 @@ def test_missing_images_can_be_backfilled_for_existing_articles(tmp_path, monkey
     from backend.app.api import routes
 
     database_path = str(tmp_path / "image-backfill.db").replace("\\", "/")
-    app = create_app(Settings(_env_file=None, database_url=f"sqlite:///{database_path}"), start_scheduler=False)
+    app = create_app(
+        Settings(_env_file=None, database_url=f"sqlite:///{database_path}", admin_api_token=ADMIN_TOKEN),
+        start_scheduler=False,
+    )
 
     async def fake_discover(articles):
         assert articles[0]["source_url"] == "https://example.org/older-story"
@@ -128,7 +140,7 @@ def test_missing_images_can_be_backfilled_for_existing_articles(tmp_path, monkey
         article_id = article.id
         session.close()
 
-        assert client.post("/api/images/discover-missing", json={}).json() == {"updated": 1}
+        assert client.post("/api/images/discover-missing", headers=admin_headers(), json={}).json() == {"updated": 1}
         result = client.get(f"/api/news/{article_id}").json()
         assert result["image_url"] == "https://cdn.example.org/story.jpg"
         assert result["image_verified"] is True
@@ -139,7 +151,10 @@ def test_manual_generation_and_failed_report_retry(tmp_path, monkeypatch):
     from backend.app.models import DailyReport
 
     database_path = str(tmp_path / "jobs.db").replace("\\", "/")
-    app = create_app(Settings(_env_file=None, database_url=f"sqlite:///{database_path}"), start_scheduler=False)
+    app = create_app(
+        Settings(_env_file=None, database_url=f"sqlite:///{database_path}", admin_api_token=ADMIN_TOKEN),
+        start_scheduler=False,
+    )
 
     async def fake_generation(_session_factory, _config, run_key=None, on_progress=None):
         if on_progress:
@@ -148,7 +163,7 @@ def test_manual_generation_and_failed_report_retry(tmp_path, monkeypatch):
 
     monkeypatch.setattr(routes, "generate_report", fake_generation)
     with TestClient(app) as client:
-        started = client.post("/api/reports/generate", json={})
+        started = client.post("/api/reports/generate", headers=admin_headers(), json={})
         assert started.status_code == 202
         deadline = time.monotonic() + 2
         job = client.get("/api/reports/status").json()
@@ -170,7 +185,7 @@ def test_manual_generation_and_failed_report_retry(tmp_path, monkeypatch):
         failed_id = failed.id
         session.close()
 
-        retried = client.post(f"/api/reports/{failed_id}/retry", json={})
+        retried = client.post(f"/api/reports/{failed_id}/retry", headers=admin_headers(), json={})
         assert retried.status_code == 202
         deadline = time.monotonic() + 2
         job = client.get("/api/reports/status").json()
