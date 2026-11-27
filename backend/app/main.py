@@ -2,8 +2,8 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 
@@ -16,6 +16,7 @@ from backend.app.services.governance import ensure_builtin_governance
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024
 
 
 def create_app(config: Settings | None = None, start_scheduler: bool = True) -> FastAPI:
@@ -55,6 +56,19 @@ def create_app(config: Settings | None = None, start_scheduler: bool = True) -> 
         engine.dispose()
 
     app = FastAPI(title="TechBref Intelligence API", version="1.0.0", lifespan=lifespan)
+
+    @app.middleware("http")
+    async def limit_request_body(request: Request, call_next):
+        """Reject oversized request bodies before they are fully buffered."""
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > MAX_REQUEST_BODY_BYTES:
+                    return JSONResponse({"detail": "Request body too large"}, status_code=413)
+            except ValueError:
+                return JSONResponse({"detail": "Invalid Content-Length header"}, status_code=400)
+        return await call_next(request)
+
     app.state.config = settings
     app.state.engine = engine
     app.state.session_factory = session_factory
