@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from backend.app.api.routes import router
 from backend.app.config import Settings, get_settings
@@ -19,6 +20,66 @@ from backend.app.services.governance import ensure_builtin_governance, prune_aud
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024
+# Upper bound on tracked rate-limit buckets before dead entries are swept.
+RATE_LIMIT_BUCKET_CAP = 4096
+
+
+class RequestBodyLimitMiddleware:
+    """Enforce MAX_REQUEST_BODY_BYTES on the bytes actually received.
+
+    A Content-Length check alone misses requests that use chunked transfer
+    encoding (no Content-Length header) and clients that declare a small
+    Content-Length but stream more; both would otherwise be fully buffered by
+    the framework. This pure-ASGI middleware counts real body bytes as they
+    arrive and rejects the request the moment the limit is exceeded.
+    """
+
+    def __init__(self, app: ASGIApp, max_bytes: int = MAX_REQUEST_BODY_BYTES) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope.get("method") in {"GET", "HEAD", "OPTIONS"}:
+            await self.app(scope, receive, send)
+            return
+        headers = {name.lower(): value for name, value in scope.get("headers") or []}
+        declared = headers.get(b"content-length")
+        if declared:
+            try:
+                if int(declared) > self.max_bytes:
+                    await self._reject(scope, receive, send)
+                    return
+            except ValueError:
+                response = JSONResponse({"detail": "Invalid Content-Length header"}, status_code=400)
+                await response(scope, receive, send)
+                return
+        received = bytearray()
+        while True:
+            message: Message = await receive()
+            if message["type"] == "http.disconnect":
+                return
+            received.extend(message.get("body", b""))
+            if len(received) > self.max_bytes:
+                await self._reject(scope, receive, send)
+                return
+            if not message.get("more_body"):
+                break
+        full_body = bytes(received)
+        replayed = False
+
+        async def replay_receive() -> Message:
+            nonlocal replayed
+            if replayed:
+                return {"type": "http.disconnect"}
+            replayed = True
+            return {"type": "http.request", "body": full_body, "more_body": False}
+
+        await self.app(scope, replay_receive, send)
+
+    async def _reject(self, scope: Scope, receive: Receive, send: Send) -> None:
+        response = JSONResponse({"detail": "Request body too large"}, status_code=413)
+        await response(scope, receive, send)
+
 
 # Browser security headers applied to every response. The CSP allows only local
 # scripts/styles, the Google Fonts origins used by the editorial theme, and
@@ -41,6 +102,8 @@ SECURITY_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
     "Content-Security-Policy": CONTENT_SECURITY_POLICY,
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
 }
 
 # In-memory per-IP sliding-window limits. Buckets: expensive operations that
@@ -72,6 +135,23 @@ def _rate_limit_bucket(path: str) -> tuple[str, int, float] | None:
     if path.startswith("/api/"):
         return "public", *RATE_LIMIT_RULES["public"]
     return None
+
+
+def _sweep_dead_rate_limit_buckets(buckets: dict, now: float) -> None:
+    """Evict rate-limit buckets that can no longer affect current limits.
+
+    A bucket whose newest event is older than its window is equivalent to an
+    empty one: the client's next request would have pruned those events and
+    started a fresh window. Sweeping only once the table is large bounds the
+    memory that rotating client addresses (for example an IPv6 /64) can
+    consume without ever resetting an attacker's active window.
+    """
+    for key in [
+        key
+        for key, events in buckets.items()
+        if not events or now - events[-1] >= RATE_LIMIT_RULES[key[0]][1]
+    ]:
+        buckets.pop(key, None)
 
 
 def _apply_security_headers(response, request: Request) -> None:
@@ -132,18 +212,10 @@ def create_app(config: Settings | None = None, start_scheduler: bool = True) -> 
         redoc_url="/redoc" if settings.expose_api_docs else None,
         openapi_url="/openapi.json" if settings.expose_api_docs else None,
     )
-
-    @app.middleware("http")
-    async def limit_request_body(request: Request, call_next):
-        """Reject oversized request bodies before they are fully buffered."""
-        content_length = request.headers.get("content-length")
-        if content_length:
-            try:
-                if int(content_length) > MAX_REQUEST_BODY_BYTES:
-                    return JSONResponse({"detail": "Request body too large"}, status_code=413)
-            except ValueError:
-                return JSONResponse({"detail": "Invalid Content-Length header"}, status_code=400)
-        return await call_next(request)
+    # Count-based body-size enforcement (covers chunked and lying Content-Length
+    # requests). Added before the HTTP middlewares below so the outermost
+    # middleware still decorates its 413/400 early returns with hardening headers.
+    app.add_middleware(RequestBodyLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
 
     @app.middleware("http")
     async def security_headers_and_rate_limit(request: Request, call_next):
@@ -158,8 +230,10 @@ def create_app(config: Settings | None = None, start_scheduler: bool = True) -> 
             client_ip = request.client.host if request.client else "unknown"
             key = (bucket, client_ip)
             buckets: dict[tuple, deque] = request.app.state.rate_limit_buckets
-            events = buckets.setdefault(key, deque())
             now = time.monotonic()
+            if len(buckets) >= RATE_LIMIT_BUCKET_CAP:
+                _sweep_dead_rate_limit_buckets(buckets, now)
+            events = buckets.setdefault(key, deque())
             while events and now - events[0] >= window:
                 events.popleft()
             if len(events) >= limit:
