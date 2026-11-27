@@ -24,11 +24,20 @@ const demoStories = [
   { id: "demo-5", category: "ai", title: "The future of autonomous AI agents", description: "A sample design-preview story demonstrating the editorial layout. This is not live or verified reporting.", summary: "A sample design-preview story demonstrating the editorial layout. This is not live or verified reporting.", source_name: "TechBrief Demo", source_url: "https://example.org/demo-agents", published_at: new Date().toISOString(), importance_score: 7.2, verification_status: "DEMO — NOT VERIFIED", impact_analysis: "Sample content only.", cve_ids: "", demo: true },
 ];
 
+function requiresAdminToken(path, method = "GET") {
+  const verb = (method || "GET").toUpperCase();
+  if (path.startsWith("/settings")) return verb !== "GET";
+  if (path === "/reports/generate") return true;
+  if (/^\/reports\/\d+\/retry(\/?$)/.test(path)) return true;
+  if (path === "/images/discover-missing") return true;
+  return /^\/(governance|agents|permissions|actions|approvals|audit-logs)(\/|$)/.test(path);
+}
+
 async function api(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (
     state.adminToken
-    && /^\/(governance|agents|permissions|actions|approvals|audit-logs)(\/|$)/.test(path)
+    && requiresAdminToken(path, options.method)
   ) headers.Authorization = `Bearer ${state.adminToken}`;
   const response = await fetch(`/api${path}`, {
     ...options,
@@ -36,9 +45,17 @@ async function api(path, options = {}) {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || `Request failed (${response.status})`);
+    const error = new Error(body.detail || `Request failed (${response.status})`);
+    error.status = response.status;
+    throw error;
   }
   return response.status === 204 ? null : response.json();
+}
+
+function adminUnlockHint(error) {
+  return (error.status === 401 || error.status === 403)
+    ? "Administrator token required: open Agent Governance, unlock with your admin token, then try again."
+    : error.message;
 }
 
 function node(tag, className = "", text = "") {
@@ -287,6 +304,8 @@ async function backfillMissingImages() {
     state.total = feed.total;
     if (state.view === "home") renderAllFeeds();
   } catch (error) {
+    // Image backfill is an administrator action; stay quiet for anonymous readers.
+    if (error.status === 401 || error.status === 403 || error.status === 503) return;
     showNotice(`Story images could not be refreshed: ${error.message}`);
   }
 }
@@ -872,7 +891,7 @@ async function saveSettings(event) {
     await api("/settings", { method: "PUT", body: JSON.stringify(settings) });
     $("#settings-message").textContent = "Preferences saved.";
   } catch (error) {
-    $("#settings-message").textContent = error.message;
+    $("#settings-message").textContent = adminUnlockHint(error);
   }
 }
 
@@ -912,7 +931,7 @@ async function generateDailyBrief() {
     }, 2500);
   } catch (error) {
     setBusy(false);
-    showNotice(error.message);
+    showNotice(adminUnlockHint(error));
   }
 }
 
