@@ -5,6 +5,7 @@ from typing import Any
 from openai import OpenAIError
 
 from backend.app.config import Settings
+from backend.app.logging_utils import clean_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,11 @@ async def summarize_articles(
             if not 80 <= word_count <= 210:
                 raise ValueError("LLM summary length fell outside the expected range")
         except (ValueError, TypeError, json.JSONDecodeError) as error:
-            logger.warning("Could not parse LLM summary for article %s: %s", article["source_url"], error)
+            logger.warning(
+                "Could not parse LLM summary for article %s: %s",
+                clean_for_log(article["source_url"]),
+                error,
+            )
             article["summary"] = article.get("description") or "No publisher description is available."
             article["impact_analysis"] = "AI analysis could not be generated; consult the original source."
             warnings.append("One or more AI summaries were invalid; publisher descriptions are shown instead.")
