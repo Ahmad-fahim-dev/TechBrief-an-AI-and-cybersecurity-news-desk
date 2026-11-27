@@ -79,17 +79,26 @@ def _require_admin(request: Request, authorization: str | None) -> str:
     if not expected:
         raise HTTPException(status_code=503, detail="Governance admin access is not configured")
     scheme, separator, supplied = (authorization or "").partition(" ")
-    if (
-        not separator
-        or scheme.lower() != "bearer"
-        or not hmac.compare_digest(supplied, expected)
-    ):
+    # hmac.compare_digest raises TypeError on non-ASCII str input; encode both
+    # sides so any malformed Authorization header fails closed as a 401 instead
+    # of surfacing as an unhandled 500.
+    try:
+        token_matches = bool(
+            separator
+            and scheme.lower() == "bearer"
+            and hmac.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
+        )
+    except (TypeError, UnicodeDecodeError):
+        token_matches = False
+    if not token_matches:
         session = _session(request)
         try:
             audit(
                 session,
                 action="admin.authenticate",
-                resource=request.url.path,
+                # Request paths are attacker-controlled and unbounded; cap to the
+                # audit column size so a denied attempt cannot break the audit write.
+                resource=request.url.path[:300],
                 result="DENY",
                 failure_reason="Missing or invalid administrator bearer token",
             )
