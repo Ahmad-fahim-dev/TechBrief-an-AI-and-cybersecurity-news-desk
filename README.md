@@ -31,7 +31,7 @@ Copy-Item .env.example .env
 uvicorn backend.app.main:app --reload
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Interactive API documentation is at `/docs`; health check is `/health`.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The health check is `/health`. Interactive API documentation (`/docs`, `/redoc`, `/openapi.json`) is disabled by default; set `EXPOSE_API_DOCS=true` to enable it in trusted environments only.
 
 To preview the editorial layouts with clearly labelled fictional sample stories when the API is unavailable, add `?demo=1` to the homepage URL. The default live mode never fills production screens with demo headlines.
 
@@ -47,6 +47,7 @@ Set values in the local `.env`, then restart the backend:
 - `RSS_FEEDS_JSON`: optional JSON array of feeds. Each item must have `category` (`ai` or `cybersecurity`), `name`, and an HTTPS `url`. Invalid entries are skipped; malformed JSON fails configuration clearly.
 - `DATABASE_URL`: defaults to `sqlite:///./techbref.db`. For PostgreSQL use a SQLAlchemy URL such as `postgresql+psycopg://user:password@host:5432/techbref`.
 - `TIMEZONE`, `SCHEDULED_TIME`, `SCHEDULE_ENABLED`, `ARTICLES_PER_CATEGORY`, and `REQUEST_TIMEOUT_SECONDS` configure defaults. Settings can also be updated through the dashboard.
+- `EXPOSE_API_DOCS`: serves `/docs`, `/redoc`, and `/openapi.json` when `true`. Keep it `false` in production.
 - `ADMIN_API_TOKEN`: required to unlock the AGENT GOVERNANCE dashboard and call governance administration APIs. Use a randomly generated secret with at least 32 characters. The token is held in browser memory only and must be sent over HTTPS outside local development.
 - `ADMIN_USER_ID`: administrator identity recorded in the governance audit log (default `admin`).
 
@@ -84,3 +85,5 @@ Tests do not require provider credentials or live network access.
 ## Deployment notes
 
 Use PostgreSQL, HTTPS termination, secret injection from the deployment platform, structured log collection, and a single scheduler owner. For multiple API replicas, move APScheduler to a dedicated worker or managed scheduler before scaling; the local scheduler is intentionally a straightforward single-process implementation. Run database migrations as a deployment step when moving beyond local development (the initial version creates tables on startup). Review API authentication and per-user authorization before exposing the service publicly. Images are embedded from their source URLs and are not downloaded or rehosted; attribution and available licensing metadata are retained, but image reuse rights must be confirmed with the publisher.
+
+The built-in rate limiter and security headers key on the direct peer address and an in-process sliding window. Behind a reverse proxy, run uvicorn with `--proxy-headers --forwarded-allow-ips <proxy-address>` so per-client IPs are reconstructed from the proxy's `X-Forwarded-For`, and enforce IP limits at the proxy for multi-replica deployments.
