@@ -2,11 +2,13 @@ import asyncio
 import ipaddress
 import logging
 import socket
+import typing
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
+import httpcore
 
 from backend.app.logging_utils import clean_for_log
 
@@ -14,6 +16,12 @@ logger = logging.getLogger(__name__)
 MAX_PAGE_BYTES = 1_000_000
 MAX_IMAGE_BYTES = 12_000_000
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"}
+
+# Hostnames whose public addresses were verified by _is_public_https_url during
+# the current discovery run, mapped to one verified public IP. Consumed by the
+# pinned transport below so the actual TCP connection targets the checked
+# address instead of re-resolving DNS.
+_PINNED_HOSTS: dict[str, str] = {}
 
 
 class _ImageMetadataParser(HTMLParser):
@@ -60,6 +68,55 @@ def _normalized_https_url(value: str, base: str | None = None) -> str | None:
         return None
 
 
+class _PinnedDNSBackend(httpcore.AnyIOBackend):
+    """TCP connector that routes verified hostnames to their checked public IPs.
+
+    The SSRF guard resolves DNS and requires every address to be public before
+    a fetch is allowed. If the HTTP request itself re-resolved DNS, an attacker
+    controlling the hostname's authoritative servers could answer with a
+    private address at fetch time (DNS rebinding). Pinning the validated
+    address closes that gap: the connection targets the checked IP while TLS
+    verification, SNI, and the Host header still use the hostname.
+    """
+
+    def __init__(self, pinned: dict[str, str]) -> None:
+        super().__init__()
+        self._pinned = pinned
+
+    async def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options: typing.Iterable[httpcore.SOCKET_OPTION] | None = None,
+    ) -> httpcore.AsyncNetworkStream:
+        host = self._pinned.get(host, host)
+        return await super().connect_tcp(
+            host, port, timeout=timeout, local_address=local_address, socket_options=socket_options
+        )
+
+
+class _PinnedTransport(httpx.AsyncHTTPTransport):
+    """httpx transport whose connection pool connects via the DNS-pinning backend."""
+
+    def __init__(self, pinned: dict[str, str], limits: httpx.Limits) -> None:
+        super().__init__(trust_env=False, limits=limits)
+        pool = self._pool
+        self._pool = httpcore.AsyncConnectionPool(
+            ssl_context=pool._ssl_context,
+            max_connections=pool._max_connections,
+            max_keepalive_connections=pool._max_keepalive_connections,
+            keepalive_expiry=pool._keepalive_expiry,
+            http1=pool._http1,
+            http2=pool._http2,
+            local_address=pool._local_address,
+            retries=pool._retries,
+            socket_options=pool._socket_options,
+            network_backend=_PinnedDNSBackend(pinned),
+        )
+
+
 def _is_public_ip(value: str) -> bool:
     try:
         return ipaddress.ip_address(value).is_global
@@ -75,6 +132,7 @@ async def _is_public_https_url(url: str) -> bool:
     if not hostname:
         return False
     if _is_public_ip(hostname):
+        _PINNED_HOSTS[hostname] = hostname
         return True
     try:
         records = await asyncio.to_thread(
@@ -83,7 +141,11 @@ async def _is_public_https_url(url: str) -> bool:
     except (OSError, UnicodeError):
         return False
     addresses = {record[4][0] for record in records}
-    return bool(addresses) and all(_is_public_ip(address) for address in addresses)
+    if not (bool(addresses) and all(_is_public_ip(address) for address in addresses)):
+        return False
+    # Remember one verified address so the fetch connects to it directly.
+    _PINNED_HOSTS[hostname] = sorted(addresses)[0]
+    return True
 
 
 async def _read_limited(response: httpx.Response, limit: int) -> bytes | None:
@@ -262,13 +324,21 @@ async def discover_article_images(
     timeout = httpx.Timeout(6.0, connect=3.0)
     limits = httpx.Limits(max_connections=8, max_keepalive_connections=4)
     semaphore = asyncio.Semaphore(4)
+    if transport is None:
+        # Bind this run's SSRF validation to the actual connection targets:
+        # every hostname _is_public_https_url accepts is pinned to one of the
+        # public addresses DNS returned during validation.
+        _PINNED_HOSTS.clear()
+        connection_transport: httpx.AsyncBaseTransport = _PinnedTransport(_PINNED_HOSTS, limits)
+    else:
+        connection_transport = transport
     async with httpx.AsyncClient(
         timeout=timeout,
         limits=limits,
         follow_redirects=False,
         trust_env=False,
         headers=headers,
-        transport=transport,
+        transport=connection_transport,
     ) as client:
         async def process(article: dict) -> dict:
             async with semaphore:
@@ -278,7 +348,7 @@ async def discover_article_images(
                     logger.warning(
                         "Image discovery failed for %s: %s",
                         clean_for_log(article.get("source_url")),
-                        error,
+                        clean_for_log(error),
                     )
                     image_fields = _fallback_result(article)
                 clean_article = {key: value for key, value in article.items() if key != "image_candidates"}

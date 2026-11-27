@@ -103,7 +103,7 @@ async def collect_recent_articles(
         )
     for feed, result in zip(feeds, results, strict=True):
         if isinstance(result, Exception):
-            logger.warning("RSS source request failed for %s: %s", clean_for_log(feed["name"]), result)
+            logger.warning("RSS source request failed for %s: %s", clean_for_log(feed["name"]), clean_for_log(result))
             warnings.append(f"Could not fetch {feed['name']}.")
             continue
         if not 200 <= result.status_code < 300:
@@ -162,7 +162,7 @@ async def collect_recent_articles(
         known_urls = {item["source_url"] for item in collected}
         for (category, _), result in zip(search_jobs, search_results, strict=True):
             if isinstance(result, Exception):
-                logger.warning("Tavily search failed for %s: %s", category, result)
+                logger.warning("Tavily search failed for %s: %s", category, clean_for_log(result))
                 warnings.append(f"Tavily search failed for {category}.")
                 continue
             if not 200 <= result.status_code < 300:

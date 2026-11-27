@@ -76,7 +76,7 @@ async def summarize_articles(
             article["impact_analysis"] = "AI analysis could not be generated; consult the original source."
             warnings.append("One or more AI summaries were invalid; publisher descriptions are shown instead.")
         except OpenAIError as error:
-            logger.warning("LLM provider request failed: %s", error)
+            logger.warning("LLM provider request failed: %s", clean_for_log(error))
             article["summary"] = article.get("description") or "No publisher description is available."
             article["impact_analysis"] = "AI analysis is unavailable due to a provider error; consult the original source."
             warnings.append("The LLM provider was unavailable; publisher descriptions are shown instead.")
