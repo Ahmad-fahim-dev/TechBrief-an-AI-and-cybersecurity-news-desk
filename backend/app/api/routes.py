@@ -74,6 +74,11 @@ def _session(request: Request) -> Session:
     return request.app.state.session_factory()
 
 
+def _escape_like(term: str) -> str:
+    """Escape SQL LIKE wildcards so search terms cannot inject %/_ patterns."""
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def _require_admin(request: Request, authorization: str | None) -> str:
     expected = request.app.state.config.admin_api_token
     if not expected:
@@ -220,7 +225,6 @@ def dashboard(request: Request) -> dict[str, Any]:
         top = session.scalars(
             select(Article).where(Article.published_at >= cutoff).order_by(Article.importance_score.desc()).limit(6)
         ).all()
-        config = request.app.state.config
         return {
             "product": "TechBref",
             "total_articles": total,
@@ -231,11 +235,6 @@ def dashboard(request: Request) -> dict[str, Any]:
             "next_scheduled_report": next_run,
             "latest_report_id": latest.id if latest else None,
             "top_stories": [ArticleOut.model_validate(article).model_dump(mode="json") for article in top],
-            "providers": {
-                "rss": True,
-                "llm_configured": bool(config.openai_api_key),
-                "search_configured": bool(config.tavily_api_key),
-            },
             "schedule": _settings_out(settings) if settings else None,
         }
     finally:
@@ -259,8 +258,12 @@ def list_news(
         query = select(Article)
         filters = [Article.importance_score >= min_importance]
         if q:
-            term = f"%{q.strip()}%"
-            filters.append(or_(Article.title.ilike(term), Article.description.ilike(term), Article.summary.ilike(term)))
+            term = f"%{_escape_like(q.strip())}%"
+            filters.append(or_(
+                Article.title.ilike(term, escape="\\"),
+                Article.description.ilike(term, escape="\\"),
+                Article.summary.ilike(term, escape="\\"),
+            ))
         if category:
             filters.append(Article.category == category)
         if source:
@@ -293,7 +296,13 @@ def get_news(article_id: int, request: Request) -> Article:
 
 
 @router.post("/images/discover-missing")
-async def discover_missing_images(request: Request) -> dict[str, Any]:
+async def discover_missing_images(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    # Spends external fetch budget and rewrites stored article image data;
+    # restricted to the configured administrator like other operator actions.
+    _require_admin(request, authorization)
     session = _session(request)
     try:
         image_grant = authorize_in_session(
@@ -412,7 +421,13 @@ def get_report(report_id: int, request: Request):
 
 
 @router.post("/reports/generate", status_code=status.HTTP_202_ACCEPTED)
-async def start_generation(request: Request):
+async def start_generation(
+    request: Request,
+    authorization: str | None = Header(default=None),
+):
+    # Report generation spends RSS/Tavily/OpenAI provider credits; require the
+    # administrator token so anonymous visitors cannot drain the budget.
+    _require_admin(request, authorization)
     current = request.app.state.job
     if current["status"] == "running":
         raise HTTPException(status_code=409, detail="A report is already being generated")
@@ -448,7 +463,12 @@ async def start_generation(request: Request):
 
 
 @router.post("/reports/{report_id}/retry", status_code=status.HTTP_202_ACCEPTED)
-async def retry_report(report_id: int, request: Request):
+async def retry_report(
+    report_id: int,
+    request: Request,
+    authorization: str | None = Header(default=None),
+):
+    _require_admin(request, authorization)
     if request.app.state.job["status"] == "running":
         raise HTTPException(status_code=409, detail="A report is already being generated")
     session = _session(request)
@@ -518,7 +538,14 @@ def _create_defaults(session: Session, request: Request) -> AppSettings:
 
 
 @router.put("/settings")
-def update_settings(data: SettingsUpdate, request: Request):
+def update_settings(
+    data: SettingsUpdate,
+    request: Request,
+    authorization: str | None = Header(default=None),
+):
+    # Settings control the scheduler and feed selection; changes are operator
+    # actions and require the administrator token.
+    _require_admin(request, authorization)
     session = _session(request)
     try:
         known_sources = {feed["name"] for feed in configured_feeds(request.app.state.config)}
