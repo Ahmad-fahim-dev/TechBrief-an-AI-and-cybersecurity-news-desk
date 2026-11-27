@@ -4,10 +4,11 @@ from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
 from backend.app.config import Settings
-from backend.app.models import AppSettings
+from backend.app.models import AppSettings, DailyReport
 from backend.app.services.report_service import generate_report
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,15 @@ async def scheduled_generation(session_factory: sessionmaker, config: Settings) 
     try:
         options = session.get(AppSettings, 1)
         if not options or not options.schedule_enabled:
+            return
+        # Skip when any other generation (manual run or another worker) is
+        # mid-flight: concurrent runs duplicate provider spend and collide on
+        # article upserts.
+        in_flight = session.scalar(
+            select(func.count()).select_from(DailyReport).where(DailyReport.status == "running")
+        ) or 0
+        if in_flight:
+            logger.info("Skipping scheduled report: another generation is already in progress")
             return
         now = datetime.now(ZoneInfo(options.timezone))
         key = f"scheduled:{now.date().isoformat()}"
