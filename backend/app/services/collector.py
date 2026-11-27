@@ -11,6 +11,7 @@ import feedparser
 import httpx
 
 from backend.app.config import Settings
+from backend.app.logging_utils import clean_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ async def collect_recent_articles(
     collected: list[dict[str, Any]] = []
     warnings: list[str] = []
     feeds = [feed for feed in configured_feeds(settings) if feed["category"] in categories]
-    headers = {"User-Agent": "TechBref/1.0 (+daily public news aggregation)"}
+    headers = {"User-Agent": "TechBrief/1.0 (+daily public news aggregation)"}
 
     async with httpx.AsyncClient(
         timeout=settings.request_timeout_seconds, follow_redirects=False, headers=headers, transport=transport
@@ -102,16 +103,16 @@ async def collect_recent_articles(
         )
     for feed, result in zip(feeds, results, strict=True):
         if isinstance(result, Exception):
-            logger.warning("RSS source request failed for %s: %s", feed["name"], result)
+            logger.warning("RSS source request failed for %s: %s", clean_for_log(feed["name"]), result)
             warnings.append(f"Could not fetch {feed['name']}.")
             continue
         if not 200 <= result.status_code < 300:
-            logger.warning("RSS source %s returned HTTP %s", feed["name"], result.status_code)
+            logger.warning("RSS source %s returned HTTP %s", clean_for_log(feed["name"]), result.status_code)
             warnings.append(f"{feed['name']} returned HTTP {result.status_code}.")
             continue
         parsed = feedparser.parse(result.content)
         if parsed.bozo:
-            logger.warning("RSS source %s returned malformed feed content", feed["name"])
+            logger.warning("RSS source %s returned malformed feed content", clean_for_log(feed["name"]))
             warnings.append(f"{feed['name']} returned malformed feed content.")
         for entry in parsed.entries:
             published = _entry_datetime(entry)

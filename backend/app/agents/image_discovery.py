@@ -8,6 +8,8 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
 
+from backend.app.logging_utils import clean_for_log
+
 logger = logging.getLogger(__name__)
 MAX_PAGE_BYTES = 1_000_000
 MAX_IMAGE_BYTES = 12_000_000
@@ -273,7 +275,11 @@ async def discover_article_images(
                 try:
                     image_fields = await _discover_one(article, client)
                 except (httpx.HTTPError, OSError, ValueError) as error:
-                    logger.warning("Image discovery failed for %s: %s", article.get("source_url"), error)
+                    logger.warning(
+                        "Image discovery failed for %s: %s",
+                        clean_for_log(article.get("source_url")),
+                        error,
+                    )
                     image_fields = _fallback_result(article)
                 clean_article = {key: value for key, value in article.items() if key != "image_candidates"}
                 return {**clean_article, **image_fields}

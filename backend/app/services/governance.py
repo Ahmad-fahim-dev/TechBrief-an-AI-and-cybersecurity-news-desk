@@ -18,6 +18,7 @@ from backend.app.models import (
 
 DEFAULT_GRANT_DAYS = 365
 APPROVAL_TTL_MINUTES = 15
+AUDIT_LOG_RETENTION_DAYS = 90
 _AUTHORIZATION_LOCK = threading.RLock()
 ACTION_RESOURCES = {
     "workflow.coordinate": ("workflow:*",),
@@ -311,3 +312,21 @@ def expire_pending_approvals(session: Session) -> None:
             failure_reason=approval.decision_reason,
             correlation_id=action_request.correlation_id if action_request else None,
         )
+
+
+def prune_audit_logs(session: Session, retention_days: int = AUDIT_LOG_RETENTION_DAYS) -> int:
+    """Delete audit records older than the retention window and return the count.
+
+    Without pruning, the append-only audit table grows without bound; stale
+    records are removed on startup and after each scheduled run. Deletion only
+    affects records outside the retention window, so recent history stays intact.
+    """
+    cutoff = utc_now() - timedelta(days=retention_days)
+    deleted = (
+        session.query(AuditLog)
+        .where(AuditLog.timestamp < cutoff)
+        .delete(synchronize_session=False)
+    )
+    if deleted:
+        session.commit()
+    return deleted

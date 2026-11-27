@@ -1,3 +1,4 @@
+import json
 from functools import lru_cache
 
 from pydantic import Field, field_validator
@@ -20,6 +21,7 @@ class Settings(BaseSettings):
     rss_feeds_json: str | None = None
     admin_api_token: str | None = Field(default=None, min_length=32)
     admin_user_id: str = Field(default="admin", min_length=1, max_length=180)
+    expose_api_docs: bool = False
 
     @field_validator("timezone")
     @classmethod
@@ -40,6 +42,20 @@ class Settings(BaseSettings):
         if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", value):
             raise ValueError("SCHEDULED_TIME must use 24-hour HH:MM format")
         return value
+
+    @field_validator("rss_feeds_json", mode="before")
+    @classmethod
+    def validate_rss_feeds_json(cls, value: str | None) -> str | None:
+        if value is None or not str(value).strip():
+            return None
+        text = str(value).strip()
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as error:
+            raise ValueError("RSS_FEEDS_JSON must contain a JSON array") from error
+        if not isinstance(parsed, list):
+            raise ValueError("RSS_FEEDS_JSON must contain a JSON array")
+        return text
 
     @field_validator("admin_api_token", mode="before")
     @classmethod
